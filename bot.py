@@ -91,7 +91,7 @@ async def help_command(ctx):
         if music_cog:
             owner_id = music_cog.session_owners.get(ctx.guild.id)
             if owner_id:
-                embed.add_field(name="👑 Sesi Saat Ini", value=f"Sesi musik sedang dipegang oleh <@{owner_id}>.", inline=False)
+                embed.add_field(name="👑 Sesi Saat Ini", value=f"Sesi musik ini dimiliki oleh <@{owner_id}>.", inline=False)
             else:
                 embed.add_field(name="👑 Sesi Saat Ini", value="Belum ada sesi musik yang berjalan. Ketik `/play` untuk memulai!", inline=False)
         
