@@ -73,37 +73,6 @@ class YTDLSource(discord.PCMVolumeTransformer):
             filename = data['url'] if stream else ytdl.prepare_filename(data)
             return [cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)]
 
-class HelpSelect(discord.ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(label="Kontrol Musik", description="Play, Pause, Skip, Stop", emoji="🎶"),
-            discord.SelectOption(label="Utilitas", description="Queue, History, Clear, Quality", emoji="⚙️")
-        ]
-        super().__init__(placeholder="Pilih Kategori Bantuan", min_values=1, max_values=1, options=options)
-
-    async def callback(self, interaction: discord.Interaction):
-        if self.values[0] == "Kontrol Musik":
-            embed = discord.Embed(title="🎶 Bantuan: Kontrol Musik", color=0x2b2d31)
-            embed.add_field(name="/play <judul/url>", value="Memutar lagu", inline=False)
-            embed.add_field(name="/pause", value="Menjeda lagu", inline=False)
-            embed.add_field(name="/resume", value="Melanjutkan lagu", inline=False)
-            embed.add_field(name="/skip", value="Melewati lagu (Butuh vote jika bukan pemilik)", inline=False)
-            embed.add_field(name="/stop", value="Menghentikan bot", inline=False)
-        elif self.values[0] == "Utilitas":
-            embed = discord.Embed(title="⚙️ Bantuan: Utilitas", color=0x2b2d31)
-            embed.add_field(name="/queue", value="Melihat antrean", inline=False)
-            embed.add_field(name="/history", value="Melihat riwayat lagu", inline=False)
-            embed.add_field(name="/clear", value="Menghapus antrean", inline=False)
-            embed.add_field(name="/quality <low/basic>", value="Mengatur kualitas audio", inline=False)
-            embed.add_field(name="/transfer <@user>", value="Mentransfer hak kepemilikan bot", inline=False)
-            
-        await interaction.response.edit_message(embed=embed)
-
-class HelpView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=120)
-        self.add_item(HelpSelect())
-
 class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -374,12 +343,6 @@ class Music(commands.Cog):
             
         self.audio_quality[ctx.guild.id] = level
         await ctx.send(f"🎚️ Kualitas audio diatur ke **{level.upper()}**! (Akan berlaku pada lagu berikutnya)")
-
-    @commands.hybrid_command(name='help', help='Menampilkan menu bantuan bot')
-    async def help_cmd(self, ctx):
-        embed = discord.Embed(title="🎵 W2E Music Basic - Help Menu", description="Pilih kategori perintah dari *dropdown* di bawah:", color=0x2b2d31)
-        embed.set_footer(text="Gunakan w!play atau /play untuk memulai.")
-        await ctx.send(embed=embed, view=HelpView())
 
 async def setup(bot):
     await bot.add_cog(Music(bot))
