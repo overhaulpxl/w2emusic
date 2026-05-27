@@ -16,6 +16,9 @@ ytdl_format_options = {
     'no_warnings': True,
     'default_search': 'auto',
     'source_address': '0.0.0.0',
+    'extractor_args': {
+        'youtube': ['player_client=android', 'player_client=default']
+    }
 }
 
 ffmpeg_options_templates = {
@@ -49,10 +52,12 @@ class YTDLSource(discord.PCMVolumeTransformer):
         self.title = data.get('title')
         self.url = data.get('url')
         self.duration = data.get('duration', 0)
+        self.uploader = data.get('uploader', 'Unknown')
 
     @classmethod
-    async def from_query(cls, query, loop=None, stream=False):
+    async def from_query(cls, query, loop=None, stream=False, custom_ffmpeg_options=None):
         loop = loop or asyncio.get_event_loop()
+        opts = custom_ffmpeg_options or {}
         if not query.startswith('http'):
             query = f'ytsearch:{query}'
             
@@ -67,11 +72,11 @@ class YTDLSource(discord.PCMVolumeTransformer):
             sources = []
             for entry in valid_entries:
                 filename = entry['url'] if stream else ytdl.prepare_filename(entry)
-                sources.append(cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=entry))
+                sources.append(cls(discord.FFmpegPCMAudio(filename, **opts), data=entry))
             return sources
         else:
             filename = data['url'] if stream else ytdl.prepare_filename(data)
-            return [cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)]
+            return [cls(discord.FFmpegPCMAudio(filename, **opts), data=data)]
 
 class Music(commands.Cog):
     def __init__(self, bot):
@@ -83,6 +88,9 @@ class Music(commands.Cog):
         self.skip_votes = {}
         self.history = {}
         self.audio_quality = {}
+        # FIX: Track idle timers and persistent volumes per guild
+        self.idle_timers = {}
+        self.volumes = {}
 
     def get_ffmpeg_options(self, guild_id):
         quality = self.audio_quality.get(guild_id, 'basic')
@@ -97,6 +105,22 @@ class Music(commands.Cog):
         return False
 
     def play_next(self, guild):
+        # FIX: Schedule task safely and attach error handler to prevent silent crashes
+        self.bot.loop.call_soon_threadsafe(self._schedule_play_next, guild)
+
+    def _schedule_play_next(self, guild):
+        task = asyncio.create_task(self.play_next_async(guild))
+        task.add_done_callback(lambda t: t.exception() and print(f"[ERROR] play_next_async error: {t.exception()}"))
+
+    async def play_next_async(self, guild):
+        # FIX: Abort playback logic if the bot has left or is leaving the VC
+        if not guild.voice_client or not guild.voice_client.is_connected():
+            return
+            
+        # FIX: Cancel any existing idle timer for this guild
+        if guild.id in self.idle_timers:
+            self.idle_timers[guild.id].cancel()
+            self.idle_timers.pop(guild.id, None)
         if self.current_song.get(guild.id):
             if guild.id not in self.history:
                 self.history[guild.id] = []
@@ -111,14 +135,30 @@ class Music(commands.Cog):
             # Reset vote skips for new song
             self.skip_votes[guild.id] = set()
             
+            # FIX: Apply persistent volume
+            player.volume = self.volumes.get(guild.id, 100) / 100.0
+            
             guild.voice_client.play(player, after=lambda e: self.play_next(guild))
             
             embed = discord.Embed(description=f"🎵 Started playing **[{player.title}]({player.url})** by **{player.uploader}**", color=0x2b2d31)
             
-            asyncio.run_coroutine_threadsafe(self.update_now_playing(guild, embed=embed), self.bot.loop)
+            await self.update_now_playing(guild, embed=embed)
         else:
             self.current_song[guild.id] = None
             self.session_owners.pop(guild.id, None)
+            
+            # FIX: Idle Timeout - Disconnect if nothing is played for 3 minutes without race conditions
+            await self.update_now_playing(guild, content="Queue finished. Waiting 3 minutes for new songs before disconnecting...", embed=None)
+            
+            async def idle_timer():
+                try:
+                    await asyncio.sleep(180)
+                    if guild.voice_client and not guild.voice_client.is_playing() and (guild.id not in self.queues or len(self.queues[guild.id]) == 0):
+                        await guild.voice_client.disconnect()
+                except asyncio.CancelledError:
+                    pass # Cancelled because a new song was played
+            
+            self.idle_timers[guild.id] = asyncio.create_task(idle_timer())
 
     async def update_now_playing(self, guild, content=None, embed=None):
         channel = None
@@ -140,7 +180,7 @@ class Music(commands.Cog):
     async def play(self, ctx, *, query: str):
         if ctx.guild.id in self.session_owners and not self.is_owner(ctx):
             owner_id = self.session_owners.get(ctx.guild.id)
-            return await ctx.send(f"❌ Saat ini sesi musik dipegang oleh <@{owner_id}>. Hanya pemilik sesi yang bisa menambahkan lagu! Minta mereka untuk mentransfer sesi dengan `/transfer` atau `{ctx.prefix}transfer @user`.")
+            return await ctx.send(f"❌ Sesi musik ini dimiliki oleh <@{owner_id}>. Hanya pemilik sesi yang bisa menambahkan lagu! Minta mereka untuk mentransfer sesi dengan `/transfer` atau `{ctx.prefix}transfer @user`.")
 
         if not ctx.author.voice:
             return await ctx.send("Kamu tidak berada di voice channel!")
@@ -168,7 +208,7 @@ class Music(commands.Cog):
             
             if ctx.guild.id not in self.session_owners:
                 self.session_owners[ctx.guild.id] = ctx.author.id
-                await ctx.send(f"👑 **{ctx.author.mention} sekarang memegang kendali atas bot ini!**")
+                await ctx.send(f"👑 **Sesi musik ini sekarang dimiliki oleh {ctx.author.mention}!**")
 
             if ctx.guild.id not in self.queues:
                 self.queues[ctx.guild.id] = []
@@ -187,6 +227,14 @@ class Music(commands.Cog):
                 self.current_song[ctx.guild.id] = players.pop(0)
                 self.queues[ctx.guild.id].extend(players)
                 self.skip_votes[ctx.guild.id] = set()
+                
+                # FIX: Apply persistent volume
+                self.current_song[ctx.guild.id].volume = self.volumes.get(ctx.guild.id, 100) / 100.0
+                
+                # FIX: Cancel any existing idle timer
+                if ctx.guild.id in self.idle_timers:
+                    self.idle_timers[ctx.guild.id].cancel()
+                    self.idle_timers.pop(ctx.guild.id, None)
                 
                 ctx.voice_client.play(self.current_song[ctx.guild.id], after=lambda e: self.play_next(ctx.guild))
                 
@@ -209,10 +257,10 @@ class Music(commands.Cog):
             
         if self.is_owner(ctx):
             self.session_owners[ctx.guild.id] = member.id
-            await ctx.send(f"👑 **Kendali bot telah dipindahkan kepada {member.mention}!**")
+            await ctx.send(f"👑 **Kepemilikan sesi telah dipindahkan kepada {member.mention}!**")
         else:
             owner_id = self.session_owners.get(ctx.guild.id)
-            await ctx.send(f"❌ Hanya pemilik sesi saat ini (<@{owner_id}>) atau Admin yang bisa memindahkan kendali!")
+            await ctx.send(f"❌ Hanya pemilik sesi saat ini (<@{owner_id}>) atau Admin yang bisa memindahkan kepemilikan sesi!")
 
     @commands.hybrid_command(name='pause', help='Menjeda lagu')
     async def pause(self, ctx):
@@ -343,6 +391,42 @@ class Music(commands.Cog):
             
         self.audio_quality[ctx.guild.id] = level
         await ctx.send(f"🎚️ Kualitas audio diatur ke **{level.upper()}**! (Akan berlaku pada lagu berikutnya)")
+
+    # FIX: Added state cleanup when bot is disconnected to prevent memory leaks and zombie sessions
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member, before, after):
+        if member.id == self.bot.user.id and before.channel is not None and after.channel is None:
+            guild_id = member.guild.id
+            if guild_id in self.queues:
+                self.queues[guild_id].clear()
+            self.current_song.pop(guild_id, None)
+            self.session_owners.pop(guild_id, None)
+            self.now_playing_messages.pop(guild_id, None)
+            self.skip_votes.pop(guild_id, None)
+            
+            # FIX: Clean up any dangling idle timers when forcefully disconnected
+            if guild_id in self.idle_timers:
+                self.idle_timers[guild_id].cancel()
+                self.idle_timers.pop(guild_id, None)
+
+    # FIX: Added volume control functionality
+    @commands.hybrid_command(name='volume', aliases=['vol'], help='Mengatur volume (0-100)')
+    async def volume(self, ctx, volume: int):
+        if not self.is_owner(ctx):
+            owner_id = self.session_owners.get(ctx.guild.id)
+            return await ctx.send(f"❌ Hanya pemilik sesi (<@{owner_id}>) atau Admin yang bisa mengatur volume!")
+            
+        if not ctx.voice_client:
+            return await ctx.send("Bot tidak berada di voice channel!")
+            
+        if not 0 <= volume <= 100:
+            return await ctx.send("Volume harus antara 0 hingga 100!")
+            
+        if ctx.voice_client.source:
+            ctx.voice_client.source.volume = volume / 100.0
+            await ctx.send(f"🔊 Volume diatur ke **{volume}%**")
+        else:
+            await ctx.send("Tidak ada lagu yang sedang diputar!")
 
 async def setup(bot):
     await bot.add_cog(Music(bot))

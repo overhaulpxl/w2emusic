@@ -37,22 +37,34 @@ Bot VIP dengan fitur komersial kelas atas yang sangat mewah dan eksklusif bagi *
 
 ---
 
-## ⚙️ Cara Menjalankan Bot
+## 🛠️ Update Terbaru (Stabilitas & UI)
+- **Cluster Manager (`launcher.py`)**: Skrip cerdas untuk menjalankan banyak bot secara bersamaan dengan fitur *auto-restart* non-blocking.
+- **Thread-Safe Playback**: Bebas dari *race-condition* dan *RuntimeError* saat memodifikasi antrean (Queue) berkat penjadwalan `asyncio` yang aman.
+- **State Cleanup & Idle Timeout**: Mencegah kebocoran memori (Memory Leak) jika bot di-*kick*, dan akan otomatis keluar dari VC setelah 3 menit menganggur.
+- **Persistent Volume (`/volume`)**: Setingan volume akan bertahan (persisten) untuk lagu-lagu berikutnya di antrean.
+- **Interactive UI (`/help`)**: Daftar perintah kini ditampilkan menggunakan Discord Dropdown Select Menu untuk mencegah *spam* teks panjang.
+
+---
+
+## ⚙️ Cara Menjalankan Bot (Cluster Mode)
 
 1. Pastikan **FFmpeg** telah terinstal di sistem Anda dan terdaftar di PATH.
 2. Install modul yang dibutuhkan:
    ```bash
    pip install -r requirements.txt
    ```
-3. Buat file `.env` di direktori masing-masing bot (Root dan `premium_bot`) dan isi dengan:
+3. Buat file `.env` di root direktori dan isi dengan format berikut (mendukung multiple bot):
    ```env
-   DISCORD_TOKEN=token_bot_anda
-   BOT_PREFIX=w!
+   BASIC_TOKEN_1=token_basic_bot_1
+   BASIC_PREFIX_1=w1!
+   
+   # Bisa ditambah BASIC_TOKEN_2, dst.
    ```
-   *(Ganti `BOT_PREFIX` menjadi `p!` untuk folder Premium).*
-4. Jalankan bot melalui terminal secara terpisah:
-   * **Terminal 1 (Basic)**: `python bot.py`
-   * **Terminal 2 (Premium)**: `cd premium_bot && python bot.py`
+4. Jalankan bot cluster manager:
+   ```bash
+   python launcher.py
+   ```
+   *(Skrip ini akan otomatis menyalakan semua bot yang terdaftar di `.env` dan me-restart mereka jika terjadi error).*
 
 ---
 *Dibuat khusus untuk ekosistem Way 2 Eternal.*
