@@ -5,6 +5,8 @@ import os
 import aiohttp
 import urllib.parse
 import io
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
 
 # Setup yt-dlp options
 ytdl_format_options = {
@@ -176,6 +178,14 @@ class MusicPremium(commands.Cog):
         self.load_whitelist()
         self.load_playlists()
         self.load_json_db()
+        
+        # Spotify setup
+        self.spotify = None
+        spotify_client_id = os.getenv('SPOTIFY_CLIENT_ID')
+        spotify_client_secret = os.getenv('SPOTIFY_CLIENT_SECRET')
+        if spotify_client_id and spotify_client_secret and spotify_client_id != "isi_client_id_kamu":
+            auth_manager = SpotifyClientCredentials(client_id=spotify_client_id, client_secret=spotify_client_secret)
+            self.spotify = spotipy.Spotify(auth_manager=auth_manager)
 
     def load_json_db(self):
         for attr, filename in [('user_stats', self.stats_file), ('user_sfx', self.sfx_file), ('user_themes', self.themes_file)]:
@@ -360,7 +370,59 @@ class MusicPremium(commands.Cog):
 
         try:
             ff_opts = self.get_ffmpeg_options(ctx.guild.id)
-            players = await YTDLSource.from_query(query, loop=self.bot.loop, stream=True, custom_ffmpeg_options=ff_opts)
+            players = []
+            
+            # Spotify URL handling
+            if 'spotify.com' in query:
+                if not self.spotify:
+                    return await ctx.send("⚠️ Bot belum dikonfigurasi untuk Spotify. Silakan tambahkan Client ID dan Secret di `.env`.")
+                
+                try:
+                    queries = []
+                    if 'track' in query:
+                        track_info = self.spotify.track(query)
+                        queries.append(f"{track_info['name']} {track_info['artists'][0]['name']} audio")
+                    elif 'playlist' in query:
+                        playlist_info = self.spotify.playlist(query)
+                        tracks = playlist_info['tracks']['items']
+                        if not tracks:
+                            return await ctx.send("Playlist Spotify kosong atau tidak ditemukan.")
+                        await ctx.send(f"🔄 Sedang memproses {min(len(tracks), 15)} lagu dari Playlist Spotify...")
+                        for item in tracks[:15]:
+                            if not item.get('track'): continue
+                            track = item['track']
+                            queries.append(f"{track['name']} {track['artists'][0]['name']} audio")
+                    elif 'album' in query:
+                        album_info = self.spotify.album(query)
+                        tracks = album_info['tracks']['items']
+                        if not tracks:
+                            return await ctx.send("Album Spotify kosong atau tidak ditemukan.")
+                        await ctx.send(f"🔄 Sedang memproses {min(len(tracks), 15)} lagu dari Album Spotify...")
+                        for track in tracks[:15]:
+                            queries.append(f"{track['name']} {track['artists'][0]['name']} audio")
+                    else:
+                        return await ctx.send("Link Spotify tidak didukung. Harap gunakan link Track, Playlist, atau Album.")
+                    
+                    if queries:
+                        # Fetch the first track first so it starts playing immediately
+                        first_players = await YTDLSource.from_query(queries[0], loop=self.bot.loop, stream=True, custom_ffmpeg_options=ff_opts)
+                        if first_players:
+                            players.extend(first_players)
+                        
+                        # Process the rest if any
+                        if len(queries) > 1:
+                            for q in queries[1:]:
+                                try:
+                                    extra = await YTDLSource.from_query(q, loop=self.bot.loop, stream=True, custom_ffmpeg_options=ff_opts)
+                                    if extra:
+                                        players.extend(extra)
+                                except Exception:
+                                    pass
+                except Exception as e:
+                    return await ctx.send(f"Gagal mengambil data dari Spotify: {e}")
+            else:
+                players = await YTDLSource.from_query(query, loop=self.bot.loop, stream=True, custom_ffmpeg_options=ff_opts)
+
             
             for p in players:
                 p.data['requester_id'] = ctx.author.id
