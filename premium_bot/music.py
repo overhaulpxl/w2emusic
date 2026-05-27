@@ -79,6 +79,43 @@ class YTDLSource(discord.PCMVolumeTransformer):
             filename = data['url'] if stream else ytdl.prepare_filename(data)
             return [cls(discord.FFmpegPCMAudio(filename, **ff_opts), data=data)]
 
+class PremiumHelpSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="Kontrol Musik", description="Play, Pause, Skip, Volume, dll", emoji="🎶"),
+            discord.SelectOption(label="Audio & Filter", description="Quality, Filter", emoji="🎛️"),
+            discord.SelectOption(label="Eksklusif Premium", description="Theme, SFX, Wrapped, Stay, Seek, Queue", emoji="💎")
+        ]
+        super().__init__(placeholder="Pilih Kategori Bantuan Premium", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        if self.values[0] == "Kontrol Musik":
+            embed = discord.Embed(title="🎶 Kontrol Musik", color=discord.Color.purple())
+            embed.add_field(name="/play <judul/url>", value="Memutar lagu", inline=False)
+            embed.add_field(name="/pause & /resume", value="Jeda & Lanjut lagu", inline=False)
+            embed.add_field(name="/skip", value="Melewati lagu", inline=False)
+            embed.add_field(name="/stop & /clear", value="Berhenti & Hapus antrean", inline=False)
+            embed.add_field(name="/volume <0-200>", value="Mengatur volume", inline=False)
+        elif self.values[0] == "Audio & Filter":
+            embed = discord.Embed(title="🎛️ Audio & Filter", color=discord.Color.purple())
+            embed.add_field(name="/quality <low/basic/hq>", value="Mengatur kualitas audio", inline=False)
+            embed.add_field(name="/filter <nama>", value="Efek (bassboost, nightcore, vaporwave, dll)", inline=False)
+        elif self.values[0] == "Eksklusif Premium":
+            embed = discord.Embed(title="💎 Eksklusif Premium", color=discord.Color.purple())
+            embed.add_field(name="/set_theme <url/file>", value="Lagu kedatangan", inline=False)
+            embed.add_field(name="/sfx_add & /sfx", value="Tambah & putar soundboard pribadi", inline=False)
+            embed.add_field(name="/wrapped", value="Statistik musik Anda", inline=False)
+            embed.add_field(name="/seek <waktu>", value="Melompat ke detik tertentu", inline=False)
+            embed.add_field(name="/stay", value="Bot 24/7 di Voice Channel", inline=False)
+            embed.add_field(name="/queue_export & /queue_import", value="Simpan & Muat antrean via txt", inline=False)
+            
+        await interaction.response.edit_message(embed=embed)
+
+class PremiumHelpView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=120)
+        self.add_item(PremiumHelpSelect())
+
 class MusicControlView(discord.ui.View):
     def __init__(self, cog, guild):
         super().__init__(timeout=None)
@@ -725,6 +762,12 @@ class MusicPremium(commands.Cog):
                     voice_client.play(discord.PCMVolumeTransformer(source, volume=0.8))
                 except:
                     pass
+
+    @commands.hybrid_command(name='help', help='Menampilkan menu bantuan Premium')
+    async def help_cmd(self, ctx):
+        embed = discord.Embed(title="💎 W2E Music Premium - Help Menu", description="Pilih kategori perintah dari *dropdown* di bawah:", color=discord.Color.purple())
+        embed.set_footer(text="Gunakan p!play atau /play untuk memulai.")
+        await ctx.send(embed=embed, view=PremiumHelpView())
 
 async def setup(bot):
     await bot.add_cog(MusicPremium(bot))

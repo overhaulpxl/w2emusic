@@ -15,7 +15,7 @@ intents.voice_states = True
 
 # Create bot instance with dynamic prefix
 BOT_PREFIX = os.getenv('BOT_PREFIX', 'w!')
-bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents, help_command=commands.DefaultHelpCommand())
+bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents, help_command=None)
 
 @bot.event
 async def on_ready():
