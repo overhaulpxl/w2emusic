@@ -29,7 +29,7 @@ basic_env = dotenv_values(".env") or {}
 processes = []
 
 logger.info("--- Menyiapkan Basic Bots ---")
-for i in range(1, 2):
+for i in range(1, 6):
     token = basic_env.get(f'BASIC_TOKEN_{i}')
     prefix = basic_env.get(f'BASIC_PREFIX_{i}', f'w{i}!')
     

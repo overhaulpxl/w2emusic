@@ -372,9 +372,6 @@ class Music(commands.Cog):
     @commands.hybrid_command(name='play', aliases=['p'], help='Memutar lagu atau playlist')
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def play(self, ctx, *, query: str):
-        if ctx.guild.id in self.session_owners and not self.is_owner(ctx):
-            owner_id = self.session_owners.get(ctx.guild.id)
-            return await ctx.send(f"Sesi ini dimiliki oleh <@{owner_id}>.")
 
         if not ctx.author.voice:
             return await ctx.send("Masuk voice channel dulu.")
@@ -495,8 +492,7 @@ class Music(commands.Cog):
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def skip(self, ctx):
         if not self.is_owner(ctx):
-            owner_id = self.session_owners.get(ctx.guild.id)
-            return await ctx.send(f"Sesi ini dimiliki oleh <@{owner_id}>.")
+            return await ctx.send(f"Hanya session owner yang bisa skip langsung. Gunakan `{self.bot.command_prefix}voteskip` untuk vote skip.")
 
         if ctx.voice_client and ctx.voice_client.is_playing():
             ctx.voice_client.stop()
@@ -709,8 +705,7 @@ class NowPlayingView(discord.ui.View):
     @discord.ui.button(label="Skip", style=discord.ButtonStyle.secondary, emoji="⏭️")
     async def skip_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.check_owner(interaction):
-            owner_id = self.cog.session_owners.get(self.guild.id)
-            return await interaction.response.send_message(f"Sesi ini dimiliki oleh <@{owner_id}>. Gunakan `/voteskip`.", ephemeral=True)
+            return await interaction.response.send_message(f"Hanya session owner yang bisa skip langsung. Gunakan `{self.cog.bot.command_prefix}voteskip`.", ephemeral=True)
             
         vc = self.guild.voice_client
         if vc and (vc.is_playing() or vc.is_paused()):
