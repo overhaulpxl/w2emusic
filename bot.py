@@ -47,7 +47,7 @@ async def on_command_error(ctx, error):
     error = getattr(error, 'original', error)
     
     if isinstance(error, commands.CommandNotFound):
-        await ctx.send("Command tidak ditemukan. Coba `w!help`.")
+        await ctx.send(f"Command tidak ditemukan. Coba `{BOT_PREFIX}help`.")
     elif isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(f"Argumen tidak lengkap. Penggunaan: `{ctx.prefix}{ctx.command.name} {ctx.command.signature}`")
     elif isinstance(error, commands.CommandOnCooldown):
@@ -117,34 +117,35 @@ class HelpSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         category = self.values[0]
+        p = self.bot_instance.command_prefix
         embed = discord.Embed(title=f"Bantuan: {category}", color=0x2b2d31)
         
         if category == "Quick Start":
             embed.description = (
-                "`w!play <judul/link>` — Putar lagu atau playlist.\n"
-                "`w!queue` — Lihat antrean.\n"
-                "`w!skip` — Lewati lagu.\n"
-                "`w!stop` — Stop playback."
+                f"`{p}play <judul/link>` — Putar lagu atau playlist.\n"
+                f"`{p}queue` — Lihat antrean.\n"
+                f"`{p}skip` — Lewati lagu.\n"
+                f"`{p}stop` — Stop playback."
             )
         elif category == "Music":
             embed.description = (
-                "`w!play <judul/link>` — Putar lagu, video YouTube, atau playlist.\n"
-                "`w!nowplaying` — Lihat lagu yang sedang diputar.\n"
-                "`w!history` — Lihat riwayat lagu."
+                f"`{p}play <judul/link>` — Putar lagu, video YouTube, atau playlist.\n"
+                f"`{p}nowplaying` — Lihat lagu yang sedang diputar.\n"
+                f"`{p}history` — Lihat riwayat lagu."
             )
         elif category == "Queue":
             embed.description = (
-                "`w!queue` — Lihat antrean.\n"
-                "`w!remove <nomor>` — Hapus lagu dari antrean.\n"
-                "`w!clear` — Kosongkan antrean."
+                f"`{p}queue` — Lihat antrean.\n"
+                f"`{p}remove <nomor>` — Hapus lagu dari antrean.\n"
+                f"`{p}clear` — Kosongkan antrean."
             )
         elif category == "Controls":
             embed.description = (
-                "`w!pause` — Jeda lagu.\n"
-                "`w!resume` — Lanjutkan lagu.\n"
-                "`w!skip` — Lewati lagu.\n"
-                "`w!stop` — Stop dan bersihkan queue.\n"
-                "`w!volume <1-100>` — Atur volume, hanya jika command ini memang ada."
+                f"`{p}pause` — Jeda lagu.\n"
+                f"`{p}resume` — Lanjutkan lagu.\n"
+                f"`{p}skip` — Lewati lagu.\n"
+                f"`{p}stop` — Stop dan bersihkan queue.\n"
+                f"`{p}volume <1-100>` — Atur volume."
             )
         elif category == "Tips":
             embed.description = (
@@ -171,8 +172,8 @@ async def help_command(ctx):
         color=0x2b2d31
     )
     
-    embed.add_field(name="Prefix", value="`w!`", inline=False)
-    embed.add_field(name="Mulai cepat", value="`w!play <judul/link>`", inline=False)
+    embed.add_field(name="Prefix", value=f"`{BOT_PREFIX}`", inline=False)
+    embed.add_field(name="Mulai cepat", value=f"`{BOT_PREFIX}play <judul/link>`", inline=False)
     
     if ctx.bot.user.display_avatar:
         embed.set_thumbnail(url=ctx.bot.user.display_avatar.url)

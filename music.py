@@ -339,7 +339,7 @@ class Music(commands.Cog):
             
             # FIX: Idle Timeout - Disconnect if nothing is played for 3 minutes without race conditions
             embed = discord.Embed(title="Queue", description="Queue masih kosong.", color=0x2b2d31)
-            embed.add_field(name="Tambah lagu", value="`w!play <judul/link>`")
+            embed.add_field(name="Tambah lagu", value=f"`{self.bot.command_prefix}play <judul/link>`")
             await self.update_now_playing(guild, embed=embed)
             
             async def idle_timer():
@@ -558,7 +558,7 @@ class Music(commands.Cog):
             await ctx.send(embed=embed)
         else:
             embed = discord.Embed(title="Queue", description="Queue masih kosong.", color=0x2b2d31)
-            embed.add_field(name="Tambah lagu", value="`w!play <judul/link>`")
+            embed.add_field(name="Tambah lagu", value=f"`{self.bot.command_prefix}play <judul/link>`")
             await ctx.send(embed=embed)
 
     @commands.hybrid_command(name='remove', help='Menghapus lagu dari antrean')
@@ -599,7 +599,7 @@ class Music(commands.Cog):
             await ctx.send(embed=embed)
         else:
             embed = discord.Embed(title="History", description="Belum ada lagu yang diputar.", color=0x2b2d31)
-            embed.add_field(name="Mulai dengar lagu", value="`w!play <judul/link>`")
+            embed.add_field(name="Mulai dengar lagu", value=f"`{self.bot.command_prefix}play <judul/link>`")
             embed.set_footer(text="W2E Music")
             await ctx.send(embed=embed)
 
@@ -659,7 +659,7 @@ class Music(commands.Cog):
     async def nowplaying(self, ctx):
         if not ctx.voice_client or not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
             embed = discord.Embed(title="Now Playing", description="Tidak ada lagu yang sedang diputar.", color=0x2b2d31)
-            embed.add_field(name="Mulai lagu", value="`w!play <judul/link>`")
+            embed.add_field(name="Mulai lagu", value=f"`{self.bot.command_prefix}play <judul/link>`")
             embed.set_footer(text="W2E Music")
             return await ctx.send(embed=embed)
 
@@ -749,7 +749,7 @@ class NowPlayingView(discord.ui.View):
             await interaction.response.send_message(embed=embed, ephemeral=True)
         else:
             embed = discord.Embed(title="Queue", description="Queue masih kosong.", color=0x2b2d31)
-            embed.add_field(name="Tambah lagu", value="`w!play <judul/link>`")
+            embed.add_field(name="Tambah lagu", value=f"`{self.cog.bot.command_prefix}play <judul/link>`")
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def on_timeout(self):

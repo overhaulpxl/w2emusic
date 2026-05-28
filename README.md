@@ -17,6 +17,8 @@ Proyek ini adalah source code resmi untuk **Way 2 Eternal (W2E) Music Bot**, seb
 
 ## 📜 Daftar Command
 
+> Prefix default adalah `w!` dan bisa diubah lewat `.env` (`BASIC_PREFIX_1`). Contoh di bawah menggunakan prefix default.
+
 | Command | Alias | Deskripsi |
 |---|---|---|
 | `w!help` | | Menampilkan menu bantuan interaktif dengan sistem dropdown. |
@@ -35,6 +37,31 @@ Proyek ini adalah source code resmi untuk **Way 2 Eternal (W2E) Music Bot**, seb
 | `w!quality <low/basic>` | | Mengubah *bitrate* audio. |
 | `w!transfer <@user>` | | Memindahkan hak Pemilik Sesi ke pengguna lain di dalam VC. |
 | `w!sync` | | *[Owner Only]* Menyinkronkan daftar *slash command* ke Discord. |
+
+---
+
+## 📁 Struktur File & Arsitektur
+
+Bot ini dipisah menjadi tiga file utama untuk mempermudah *maintenance* dan menjaga stabilitas:
+
+* **`launcher.py`**: Bertindak sebagai entri utama dan *Process Manager*. Tugasnya membaca *environment variables* (`BASIC_TOKEN_1`, `BASIC_PREFIX_1`), melakukan setup awal, meneruskan prefix ke bot, serta memantau berjalannya proses bot dengan fitur *auto-restart* otomatis jika terjadi *crash*.
+* **`bot.py`**: Merupakan *Discord Client Setup*. File ini mengatur konfigurasi *Discord bot*, pengaturan prefix (`BOT_PREFIX`), inisialisasi *intents*, menyusun menu bantuan interaktif (*help menu*), menangani *global error handler*, dan memuat modul tambahan (*cog*).
+* **`music.py`**: Adalah inti dari pemutar musik. Semua fitur berfokus di sini: *play*, *queue*, *playlist*, *yt-dlp*, integrasi *FFmpeg*, *Now Playing Component*, *history*, pengatur *volume*, sistem *session ownership*, dan logika utama *playback*.
+
+### 🔄 Alur Konfigurasi Prefix (Environment Flow)
+
+1. Bot dijalankan secara normal menggunakan command:
+   ```bash
+   python launcher.py
+   ```
+2. `launcher.py` akan membaca konfigurasi awal dari `.env`, spesifiknya:
+   - `BASIC_TOKEN_1`
+   - `BASIC_PREFIX_1`
+3. `launcher.py` lalu mengatur dan meneruskan variabel internal bernama `BOT_PREFIX`.
+4. Terakhir, `bot.py` menggunakan `BOT_PREFIX` ini sebagai *command prefix* utama bot.
+
+**Catatan Prefix:**
+Prefix bot sepenuhnya dinamis dan bisa diubah kapan saja dari `.env`. Sebagai contoh, jika Anda mengatur `BASIC_PREFIX_1=!`, maka *command* yang digunakan akan berubah menjadi `!help`, `!play`, dst. Prefix bawaan (default) jika tidak diatur adalah `w!`.
 
 ---
 
