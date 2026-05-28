@@ -1,70 +1,84 @@
-# 🎵 W2E Music Bot Ecosystem
+# 🎵 W2E Music Bot
 
-Proyek ini berisi ekosistem Bot Musik Discord **Way 2 Eternal (W2E)** yang terbagi menjadi dua sistem independen: **Basic Bot** (untuk pengguna publik/kasual) dan **Premium Bot** (untuk pelanggan berbayar/VIP dengan fitur "Sultan").
-
----
-
-## 📁 Struktur Proyek
-- `/` (Root): Berisi kode sumber untuk **Basic Bot**.
-- `/premium_bot`: Berisi kode sumber eksklusif untuk **Premium Bot**.
-
-Kedua bot berjalan secara independen dan memiliki file `.env` serta database masing-masing.
+Proyek ini adalah source code resmi untuk **Way 2 Eternal (W2E) Music Bot**, sebuah bot musik Discord yang dirancang sangat ringan, stabil, dan memiliki antarmuka (UI/UX) minimalis yang rapi. 
 
 ---
 
-## 🥉 Basic Bot (`w!`)
-Bot kasual yang dirancang dengan antarmuka yang sangat bersih dan minimalis (Jockie Music Style). Sangat ringan dan cocok untuk server publik.
-* **Minimalist UI**: Tidak ada *progress bar* yang panjang. Menampilkan pesan Now Playing yang sangat tipis dan elegan.
-* **Audio Hemat Kuota**: Default berjalan di kualitas standar (128kbps) dan bisa diturunkan hingga (64kbps) menggunakan command `/quality`.
-* **Fitur Utama**: Hybrid Command (`w!play` atau `/play`), Sistem Kepemilikan Sesi (Anti-Rebutan), `/skip`, `/stop`, `/queue`, dan `/history` (merekam 10 lagu terakhir).
-* **Anti-Spam**: Pesan Now Playing akan selalu menimpa/mengedit pesan sebelumnya agar chat Discord tidak kotor.
+## 🌟 Fitur Utama
+* **Hybrid Commands**: Mendukung prefix (`w!`) maupun *slash command* (`/`).
+* **Minimalist UI & Empty States**: Tidak ada spam chat! Tampilan bersih dengan *Embeds* rapi untuk antrean kosong, riwayat kosong, maupun *Now Playing*.
+* **Interactive Now Playing**: *Embed* lagu yang sedang diputar dilengkapi dengan tombol pintar (Pause/Resume, Skip, Stop, Queue) yang akan kedaluwarsa setelah 3 menit.
+* **Sistem Kepemilikan Sesi (Session Ownership)**: Pengguna pertama yang memutar lagu akan menjadi "Pemilik Sesi". Mencegah troll/user iseng mengganggu antrean, menjeda, atau melewati lagu secara paksa (kecuali lewat sistem `/voteskip` atau status admin).
+* **Hemat Kuota & Kualitas Audio**: Default berjalan di kualitas standar (128kbps) dan bisa diturunkan menjadi (64kbps) dengan `w!quality low`.
+* **Thread-Safe Playback**: Bebas dari masalah `no running event loop` maupun bug tumpang-tindih saat memproses antrean lagu.
+* **Auto-Idle Timeout**: Mencegah kebocoran memori (Memory Leak) dengan cara memutus koneksi bot secara aman (keluar dari VC) apabila menganggur selama 3 menit.
 
 ---
 
-## 💎 Premium Bot (`p!`)
-Bot VIP dengan fitur komersial kelas atas yang sangat mewah dan eksklusif bagi *user* yang di-*whitelist*.
-* **Music Card UI (Rich Embed)**: Tampilan visual *Now Playing* yang sangat besar dan memukau, lengkap dengan *Thumbnail* gambar dari YouTube/sumber lagu.
-* **Lossless Audio (Studio Quality)**: Mendukung pengubahan kualitas suara hingga **320kbps (HD)** menggunakan command `/quality hq`.
-* **Sistem "Sultan" Eksklusif**:
-  * **Lagu Kedatangan (`/set_theme`)**: User bisa memasang lagu tema yang akan otomatis diputar bot selama 5 detik setiap kali mereka memasuki Voice Channel.
-  * **Papan Suara Pribadi (`/sfx_add` & `/sfx`)**: User bisa mengunggah file MP3 efek suara lucu/meme mereka sendiri dan memutarnya secara instan di VC.
-  * **Spotify Wrapped Pribadi (`/wrapped`)**: Bot mencatat statistik mendengarkan musik (*Total Durasi, Top 3 Artis, Top 3 Lagu*) untuk dipamerkan.
-* **Kontrol Musik Tingkat Lanjut**:
-  * **`/seek`**: Melompat ke menit/detik tertentu di pertengahan lagu.
-  * **`/queue_export` & `/queue_import`**: Mencetak ratusan lagu di antrean ke file `.txt` dan memasukkannya kembali.
-  * **`/stay`**: Memaksa bot berjaga di Voice Channel 24/7 (Sangat cocok untuk radio Lo-Fi).
-  * **Autoplay & Custom Playlist**: Menarik lagu otomatis saat antrean habis, dan menyimpan *playlist* pribadi dalam JSON.
+## 📜 Daftar Command
+
+| Command | Alias | Deskripsi |
+|---|---|---|
+| `w!help` | | Menampilkan menu bantuan interaktif dengan sistem dropdown. |
+| `w!play <query/link>` | `w!p` | Memutar lagu dari judul, video URL, atau playlist URL YouTube. |
+| `w!nowplaying` | `w!np` | Menampilkan lagu yang sedang diputar + tombol interaktif. |
+| `w!queue` | `w!q` | Melihat isi antrean lagu. |
+| `w!history` | | Melihat daftar riwayat 10 lagu terakhir yang diputar. |
+| `w!pause` | | Menjeda pemutaran musik (khusus Pemilik Sesi). |
+| `w!resume` | | Melanjutkan lagu yang dijeda (khusus Pemilik Sesi). |
+| `w!skip` | `w!s` | Melewati lagu ke trek berikutnya (khusus Pemilik Sesi). |
+| `w!voteskip` | | Voting bersama untuk melewati lagu tanpa harus menjadi Pemilik Sesi (butuh 50% suara VC). |
+| `w!stop` | `w!leave` | Mematikan bot, membersihkan queue, dan keluar dari VC. |
+| `w!remove <nomor>` | | Menghapus lagu tertentu dari antrean. |
+| `w!clear` | | Mengosongkan seluruh antrean tanpa mematikan lagu yang sedang terputar. |
+| `w!volume <0-100>` | `w!vol` | Mengatur volume lagu. Setingan ini persisten untuk server Anda. |
+| `w!quality <low/basic>` | | Mengubah *bitrate* audio. |
+| `w!transfer <@user>` | | Memindahkan hak Pemilik Sesi ke pengguna lain di dalam VC. |
+| `w!sync` | | *[Owner Only]* Menyinkronkan daftar *slash command* ke Discord. |
 
 ---
 
-## 🛠️ Update Terbaru (Stabilitas & UI)
-- **Cluster Manager (`launcher.py`)**: Skrip cerdas untuk menjalankan banyak bot secara bersamaan dengan fitur *auto-restart* non-blocking.
-- **Thread-Safe Playback**: Bebas dari *race-condition* dan *RuntimeError* saat memodifikasi antrean (Queue) berkat penjadwalan `asyncio` yang aman.
-- **State Cleanup & Idle Timeout**: Mencegah kebocoran memori (Memory Leak) jika bot di-*kick*, dan akan otomatis keluar dari VC setelah 3 menit menganggur.
-- **Persistent Volume (`/volume`)**: Setingan volume akan bertahan (persisten) untuk lagu-lagu berikutnya di antrean.
-- **Interactive UI (`/help`)**: Daftar perintah kini ditampilkan menggunakan Discord Dropdown Select Menu untuk mencegah *spam* teks panjang.
+## ⚙️ Cara Menjalankan Bot (Manual via Terminal)
 
----
+Bot ini menggunakan arsitektur *Cluster Manager* (`launcher.py`) yang memungkinkan fitur *auto-restart* jika terjadi *crash*.
 
-## ⚙️ Cara Menjalankan Bot (Cluster Mode)
-
-1. Pastikan **FFmpeg** telah terinstal di sistem Anda dan terdaftar di PATH.
-2. Install modul yang dibutuhkan:
+1. Pastikan **FFmpeg** telah terinstal di sistem Anda (wajib untuk memproses audio Discord).
+2. Install modul Python yang dibutuhkan:
    ```bash
    pip install -r requirements.txt
    ```
-3. Buat file `.env` di root direktori dan isi dengan format berikut (mendukung multiple bot):
+3. Buat file `.env` di direktori proyek, salin dari `.env.example`, lalu sesuaikan tokennya:
    ```env
-   BASIC_TOKEN_1=token_basic_bot_1
-   BASIC_PREFIX_1=w1!
-   
-   # Bisa ditambah BASIC_TOKEN_2, dst.
+   BASIC_TOKEN_1=MTEyMzQ1...
+   BASIC_PREFIX_1=w!
    ```
-4. Jalankan bot cluster manager:
+4. Jalankan *launcher*:
    ```bash
    python launcher.py
    ```
-   *(Skrip ini akan otomatis menyalakan semua bot yang terdaftar di `.env` dan me-restart mereka jika terjadi error).*
 
 ---
-*Dibuat khusus untuk ekosistem Way 2 Eternal.*
+
+## 🐳 Deployment via Docker (Rekomendasi)
+
+Jalankan bot dengan mudah menggunakan Docker tanpa perlu menginstal FFmpeg maupun Python secara manual.
+
+1. **Cara run dengan Docker (Background/Detached):**
+   ```bash
+   docker compose up -d --build
+   ```
+
+2. **Cara lihat logs real-time:**
+   ```bash
+   docker compose logs -f
+   ```
+
+3. **Cara mematikan bot:**
+   ```bash
+   docker compose down
+   ```
+
+**Catatan Environment & Docker:**
+- Pastikan file `.env` (mengikuti format `.env.example` dengan prefix `BASIC_TOKEN_1`) sudah ada sebelum menjalankan *docker compose*.
+- Direktori `logs/` otomatis di-*mount* ke *host machine* sehingga file log tetap persisten dan aman walau kontainer dimatikan.
+- **JANGAN PERNAH** meng-upload/mendorong file `.env` ke layanan Git publik (Github/Gitlab).

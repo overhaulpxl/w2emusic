@@ -1,8 +1,22 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import os
 from dotenv import load_dotenv
 import asyncio
+import logging
+import sys
+
+os.makedirs('logs', exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    handlers=[
+        logging.FileHandler("logs/bot.log", encoding='utf-8'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger('Bot')
 
 # Load environment variables
 load_dotenv()
@@ -19,11 +33,65 @@ bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents, help_command=None
 
 @bot.event
 async def on_ready():
-    print(f'Logged in as {bot.user.name} (ID: {bot.user.id})')
-    print('------')
+    logger.info(f'Logged in as {bot.user.name} (ID: {bot.user.id})')
+    logger.info('------')
     # FIX: Removed auto-sync on ready to prevent Discord API rate limits.
     # Commands should be synced manually using the !sync command.
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name=f"{BOT_PREFIX}play | /play"))
+
+@bot.event
+async def on_command_error(ctx, error):
+    if hasattr(ctx.command, 'on_error'):
+        return
+        
+    error = getattr(error, 'original', error)
+    
+    if isinstance(error, commands.CommandNotFound):
+        await ctx.send("Command tidak ditemukan. Coba `w!help`.")
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"Argumen tidak lengkap. Penggunaan: `{ctx.prefix}{ctx.command.name} {ctx.command.signature}`")
+    elif isinstance(error, commands.CommandOnCooldown):
+        await ctx.send(f"Tunggu **{error.retry_after:.1f}s** sebelum pakai command ini lagi.")
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send("Argumen tidak valid.")
+    elif isinstance(error, commands.CheckFailure):
+        pass # Handle in specific commands if needed
+    else:
+        logger.error(f"Error executing command {ctx.command}: {error}", exc_info=error)
+        try:
+            await ctx.send("Terjadi kesalahan internal.")
+        except:
+            pass
+
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.CommandOnCooldown):
+        msg = f"Tunggu **{error.retry_after:.1f}s** sebelum pakai command ini lagi."
+        if not interaction.response.is_done():
+            await interaction.response.send_message(msg, ephemeral=True)
+        else:
+            await interaction.followup.send(msg, ephemeral=True)
+    elif isinstance(error, app_commands.MissingPermissions):
+        msg = "Izin ditolak."
+        if not interaction.response.is_done():
+            await interaction.response.send_message(msg, ephemeral=True)
+    elif isinstance(error, app_commands.BotMissingPermissions):
+        msg = "Bot tidak punya izin."
+        if not interaction.response.is_done():
+            await interaction.response.send_message(msg, ephemeral=True)
+    elif isinstance(error, app_commands.CheckFailure):
+        msg = "Syarat command tidak terpenuhi."
+        if not interaction.response.is_done():
+            await interaction.response.send_message(msg, ephemeral=True)
+    else:
+        logger.error(f"App command error: {error}", exc_info=error)
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("Terjadi kesalahan internal.", ephemeral=True)
+            else:
+                await interaction.followup.send("Terjadi kesalahan internal.", ephemeral=True)
+        except:
+            pass
 
 # FIX: Added a manual sync command for the bot owner
 @bot.command(name='sync', help='Sync slash commands (Owner only)')
@@ -38,36 +106,55 @@ async def sync(ctx):
 class HelpSelect(discord.ui.Select):
     def __init__(self, bot_instance):
         self.bot_instance = bot_instance
-        options = []
-        for cmd in sorted(bot_instance.commands, key=lambda c: c.name):
-            if cmd.name in ['sync', 'help'] or cmd.hidden:
-                continue
-            
-            desc = (cmd.help[:97] + '...') if cmd.help and len(cmd.help) > 100 else (cmd.help or "Tidak ada deskripsi")
-            options.append(discord.SelectOption(
-                label=f"/{cmd.name}", 
-                description=desc,
-                emoji="🎵"
-            ))
-            
-        super().__init__(placeholder="Pilih perintah untuk melihat detail...", min_values=1, max_values=1, options=options)
+        options = [
+            discord.SelectOption(label="Quick Start", description="Command paling penting buat mulai"),
+            discord.SelectOption(label="Music", description="Play lagu, playlist, dan now playing"),
+            discord.SelectOption(label="Queue", description="Lihat dan atur antrean"),
+            discord.SelectOption(label="Controls", description="Pause, resume, skip, stop"),
+            discord.SelectOption(label="Tips", description="Format link dan batasan bot")
+        ]
+        super().__init__(placeholder="Pilih kategori bantuan...", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
-        cmd_name = self.values[0].replace('/', '')
-        cmd = self.bot_instance.get_command(cmd_name)
+        category = self.values[0]
+        embed = discord.Embed(title=f"Bantuan: {category}", color=0x2b2d31)
         
-        if not cmd:
-            return await interaction.response.send_message("Perintah tidak ditemukan!", ephemeral=True)
+        if category == "Quick Start":
+            embed.description = (
+                "`w!play <judul/link>` — Putar lagu atau playlist.\n"
+                "`w!queue` — Lihat antrean.\n"
+                "`w!skip` — Lewati lagu.\n"
+                "`w!stop` — Stop playback."
+            )
+        elif category == "Music":
+            embed.description = (
+                "`w!play <judul/link>` — Putar lagu, video YouTube, atau playlist.\n"
+                "`w!nowplaying` — Lihat lagu yang sedang diputar.\n"
+                "`w!history` — Lihat riwayat lagu."
+            )
+        elif category == "Queue":
+            embed.description = (
+                "`w!queue` — Lihat antrean.\n"
+                "`w!remove <nomor>` — Hapus lagu dari antrean.\n"
+                "`w!clear` — Kosongkan antrean."
+            )
+        elif category == "Controls":
+            embed.description = (
+                "`w!pause` — Jeda lagu.\n"
+                "`w!resume` — Lanjutkan lagu.\n"
+                "`w!skip` — Lewati lagu.\n"
+                "`w!stop` — Stop dan bersihkan queue.\n"
+                "`w!volume <1-100>` — Atur volume, hanya jika command ini memang ada."
+            )
+        elif category == "Tips":
+            embed.description = (
+                "- Bisa pakai judul lagu langsung.\n"
+                "- Bisa pakai link YouTube video.\n"
+                "- Bisa pakai link YouTube playlist.\n"
+                "- Link `watch?v=...&list=...` dibaca sebagai playlist.\n"
+                "- Durasi maksimal lagu adalah 2 jam."
+            )
             
-        embed = discord.Embed(
-            title=f"Detail Perintah: /{cmd.name}", 
-            description=cmd.help or "Tidak ada deskripsi", 
-            color=0x2b2d31
-        )
-        if cmd.aliases:
-            embed.add_field(name="Bisa juga diketik dengan alias:", value=", ".join([f"`{a}`" for a in cmd.aliases]), inline=False)
-            
-        embed.set_footer(text="Gunakan Slash Command (/) atau Prefix untuk memanggilnya")
         await interaction.response.edit_message(embed=embed, view=self.view)
 
 class HelpView(discord.ui.View):
@@ -75,25 +162,22 @@ class HelpView(discord.ui.View):
         super().__init__(timeout=180)
         self.add_item(HelpSelect(bot_instance))
 
-@bot.hybrid_command(name='help', help='Menampilkan daftar semua perintah bot')
+@bot.hybrid_command(name='help', help='Lihat daftar command')
+@commands.cooldown(1, 3, commands.BucketType.user)
 async def help_command(ctx):
     embed = discord.Embed(
-        title="🎵 W2E Music Bot - Help Menu", 
-        description="Gunakan menu dropdown di bawah ini untuk melihat detail lengkap dari setiap perintah musik yang tersedia!\n\n**Sistem Kepemilikan (Ownership):**\nOrang pertama yang memutar lagu akan menjadi `Pemilik Sesi`. Hanya pemilik sesi (dan Admin) yang bisa menggunakan perintah `/skip`, `/stop`, `/volume`, dll.", 
+        title="W2E Music", 
+        description="Music bot simpel buat muter lagu, playlist, dan ngatur queue.", 
         color=0x2b2d31
     )
+    
+    embed.add_field(name="Prefix", value="`w!`", inline=False)
+    embed.add_field(name="Mulai cepat", value="`w!play <judul/link>`", inline=False)
+    
     if ctx.bot.user.display_avatar:
         embed.set_thumbnail(url=ctx.bot.user.display_avatar.url)
         
-    # FIX: Tampilkan status ownership saat ini
-    if ctx.guild:
-        music_cog = ctx.bot.get_cog('Music')
-        if music_cog:
-            owner_id = music_cog.session_owners.get(ctx.guild.id)
-            if owner_id:
-                embed.add_field(name="👑 Sesi Saat Ini", value=f"Sesi musik ini dimiliki oleh <@{owner_id}>.", inline=False)
-            else:
-                embed.add_field(name="👑 Sesi Saat Ini", value="Belum ada sesi musik yang berjalan. Ketik `/play` untuk memulai!", inline=False)
+    embed.set_footer(text="Pilih kategori di bawah untuk detail command.")
         
     view = HelpView(bot)
     await ctx.send(embed=embed, view=view)
@@ -107,7 +191,7 @@ async def main():
         if TOKEN and TOKEN != "your_bot_token_here":
             await bot.start(TOKEN)
         else:
-            print("ERROR: Please set your DISCORD_TOKEN in the .env file.")
+            logger.error("Please set your DISCORD_TOKEN in the .env file.")
 
 if __name__ == '__main__':
     asyncio.run(main())

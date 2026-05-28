@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  w2e-music:
+    build: .
+    container_name: w2e-music
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
