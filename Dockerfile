@@ -6,7 +6,7 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg && \
+    apt-get install -y --no-install-recommends ffmpeg gcc g++ make libffi-dev libsodium-dev python3-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
