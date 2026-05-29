@@ -3,7 +3,7 @@ import os
 import sys
 import time
 import logging
-from dotenv import dotenv_values
+from dotenv import load_dotenv
 
 os.makedirs('logs', exist_ok=True)
 logging.basicConfig(
@@ -23,17 +23,16 @@ logger.info("="*50)
 # Pastikan path eksekusi python sesuai dengan environment
 python_exe = sys.executable
 
-# Load variables dari file .env masing-masing
-basic_env = dotenv_values(".env") or {}
-
+# Load variables dari file .env jika dijalankan secara lokal (Docker akan langsung lewat os.environ)
+load_dotenv()
 processes = []
 
 logger.info("--- Menyiapkan Basic Bots ---")
 for i in range(1, 6):
-    token = basic_env.get(f'BASIC_TOKEN_{i}')
-    prefix = basic_env.get(f'BASIC_PREFIX_{i}', f'w{i}!')
+    token = os.getenv(f'BASIC_TOKEN_{i}')
+    prefix = os.getenv(f'BASIC_PREFIX_{i}', f'w{i}!')
     
-    if token and token != "your_bot_token_here":
+    if token and not token.startswith("your_"):
         env = os.environ.copy()
         env['DISCORD_TOKEN'] = token
         env['BOT_PREFIX'] = prefix
