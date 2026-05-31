@@ -5,6 +5,7 @@ import asyncio
 import time
 import logging
 import urllib.parse
+import os
 
 logger = logging.getLogger('Music')
 
@@ -26,6 +27,15 @@ ytdl_format_options = {
         'youtube': ['player_client=android', 'player_client=default']
     }
 }
+
+# Add cookies support if configured
+cookies_file = os.getenv('YTDLP_COOKIES_FILE')
+if cookies_file:
+    if os.path.exists(cookies_file):
+        ytdl_format_options['cookiefile'] = cookies_file
+        logger.info("Loaded yt-dlp cookies from configured file.")
+    else:
+        logger.warning("YTDLP_COOKIES_FILE is set but file was not found. Continuing without cookies.")
 
 ffmpeg_options_templates = {
     'low': {'options': '-vn -b:a 64k', 'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'},
