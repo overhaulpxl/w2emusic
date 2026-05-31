@@ -199,7 +199,11 @@ class TrackInfo:
         if not self.is_lazy:
             return
             
-        data = await robust_extract_info(loop, self.url, ytdl_format_options)
+        resolve_opts = dict(ytdl_format_options)
+        resolve_opts['ignoreerrors'] = False
+        resolve_opts['noplaylist'] = True
+        
+        data = await robust_extract_info(loop, self.url, resolve_opts)
         if not data:
             raise Exception("Lagu tidak tersedia atau private.")
             
@@ -256,7 +260,10 @@ class TrackInfo:
                 else:
                     raise Exception("Gagal mengambil lagu. Coba judul atau link lain.")
             else:
-                data = await robust_extract_info(loop, normalized_query, ytdl_format_options)
+                direct_opts = dict(ytdl_format_options)
+                if not is_playlist:
+                    direct_opts['ignoreerrors'] = False
+                data = await robust_extract_info(loop, normalized_query, direct_opts)
         except Exception as e:
             if is_playlist and playlist_id:
                 logger.warning(f"yt-dlp extract_info failed for {normalized_query}, trying fallback with playlist_id {playlist_id}")
