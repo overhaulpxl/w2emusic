@@ -115,3 +115,22 @@ Jalankan bot dengan mudah menggunakan Docker tanpa perlu menginstal FFmpeg maupu
 - **JANGAN PERNAH** meng-upload/mendorong file `.env` ke layanan Git publik (Github/Gitlab).
 - **KEAMANAN TOKEN**: Jika token asli bot Anda pernah bocor atau terlihat di screenshot, chat, log publik, atau source code, token tersebut sudah dikompromikan. Segera lakukan **Regenerate Token** dari [Discord Developer Portal](https://discord.com/developers/applications).
 
+### 🛠️ Troubleshooting Docker (yt-dlp Cookies)
+Jika bot gagal memutar lagu dari YouTube dengan pesan `Sign in to confirm you're not a bot`, pastikan konfigurasi cookies sudah benar untuk Docker:
+1. Ekspor cookies dari browser Anda ke dalam file `youtube_cookies.txt`.
+2. Letakkan file tersebut di dalam folder `cookies/` pada host Anda.
+3. Untuk Docker, gunakan path berikut di dalam file `.env`:
+   ```env
+   YTDLP_COOKIES_FILE=/app/cookies/youtube_cookies.txt
+   ```
+4. Pastikan file `docker-compose.yml` telah melampirkan mount berikut:
+   ```yaml
+   volumes:
+     - ./cookies:/app/cookies:ro
+   ```
+5. Setelah mengubah `.env` atau menambahkan file cookies, muat ulang kontainer dengan:
+   ```bash
+   docker compose down
+   docker compose up -d --build
+   ```
+

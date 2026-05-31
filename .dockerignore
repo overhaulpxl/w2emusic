@@ -11,3 +11,6 @@ venv/
 README.md
 log.txt
 backup_public_release/
+cookies
+*.cookies.txt
+youtube_cookies.txt

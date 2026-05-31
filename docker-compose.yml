@@ -9,4 +9,4 @@ services:
       - .env
     volumes:
       - ./logs:/app/logs
-      - ./cookies:/app/cookies
+      - ./cookies:/app/cookies:ro

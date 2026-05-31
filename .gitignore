@@ -7,3 +7,5 @@ venv/
 backup_public_release/
 *.json
 cookies/
+*.cookies.txt
+youtube_cookies.txt

@@ -33,7 +33,7 @@ cookies_file = os.getenv('YTDLP_COOKIES_FILE')
 if cookies_file:
     if os.path.exists(cookies_file):
         ytdl_format_options['cookiefile'] = cookies_file
-        logger.info("Loaded yt-dlp cookies from configured file.")
+        logger.info("yt-dlp cookies enabled")
     else:
         logger.warning("YTDLP_COOKIES_FILE is set but file was not found. Continuing without cookies.")
 
