@@ -63,6 +63,75 @@ def format_duration(seconds):
 
 import urllib.parse
 
+def score_search_candidate(candidate, original_query):
+    score = 0
+    title = candidate.get('title', '').lower()
+    uploader = candidate.get('uploader', '').lower()
+    query_lower = original_query.lower()
+
+    # Relevancy check: give a small boost if the primary keywords are in title/uploader
+    query_words = query_lower.split()
+    matched_words = sum(1 for w in query_words if w in title or w in uploader)
+    score += (matched_words / max(1, len(query_words))) * 10 
+
+    if 'official audio' in title:
+        score += 50
+    if 'audio' in title:
+        score += 20
+    if 'topic' in uploader or 'artist - topic' in uploader:
+        score += 50
+    if 'lyrics' in title or 'lyric video' in title:
+        score += 30
+
+    negative_keywords = [
+        ('official music video', 20), ('music video', 20), ('mv', 20), ('video clip', 20),
+        ('nightcore', 100), ('slowed', 100), ('reverb', 100), ('sped up', 100), ('speed up', 100), 
+        ('bass boosted', 100), ('8d audio', 100), ('remix', 50), ('cover', 50), ('karaoke', 100), 
+        ('instrumental', 50), ('live', 40), ('concert', 40), ('reaction', 100), ('shorts', 100), 
+        ('tiktok version', 100), ('edit audio', 100), ('loop', 100), ('extended', 100), 
+        ('1 hour', 100), ('10 hours', 100), ('interview', 100), ('trailer', 100), ('teaser', 100), 
+        ('behind the scenes', 100)
+    ]
+
+    for kw, penalty in negative_keywords:
+        if kw in title and kw not in query_lower:
+            score -= penalty
+
+    return score
+
+async def robust_extract_info(loop, url, base_opts):
+    opts = dict(base_opts)
+    ytdl_client = yt_dlp.YoutubeDL(opts)
+    try:
+        data = await loop.run_in_executor(None, lambda: ytdl_client.extract_info(url, download=False))
+        return data
+    except Exception as e:
+        error_str = str(e)
+        if "Requested format is not available" in error_str:
+            logger.warning(f"Resolve fallback triggered | reason=requested_format_unavailable | fallback=bestaudio")
+            opts['format'] = 'bestaudio'
+            fallback_ytdl = yt_dlp.YoutubeDL(opts)
+            try:
+                return await loop.run_in_executor(None, lambda: fallback_ytdl.extract_info(url, download=False))
+            except Exception as fallback_e:
+                logger.warning(f"Resolve fallback 2 triggered | reason=bestaudio_unavailable | fallback=best")
+                opts['format'] = 'best'
+                fallback_ytdl2 = yt_dlp.YoutubeDL(opts)
+                try:
+                    return await loop.run_in_executor(None, lambda: fallback_ytdl2.extract_info(url, download=False))
+                except Exception as fallback_e2:
+                    logger.error(f"Robust extract completely failed after fallbacks: {fallback_e2}")
+                    raise Exception("Gagal mengambil lagu. Coba judul atau link lain.")
+        elif "Sign in to confirm you're not a bot" in error_str:
+            logger.error(f"Anti-bot error: {error_str}")
+            raise Exception("Gagal mengambil lagu. Coba judul atau link lain.")
+        elif "Private video" in error_str or "Video unavailable" in error_str:
+            logger.error(f"Private/Unavailable error: {error_str}")
+            raise Exception("Lagu tidak tersedia atau private.")
+        else:
+            logger.error(f"General extract_info error: {error_str}")
+            raise Exception("Gagal mengambil lagu. Coba judul atau link lain.")
+
 def normalize_youtube_input(query):
     """
     Normalizes a YouTube URL to ensure playlists are correctly processed.
@@ -130,7 +199,7 @@ class TrackInfo:
         if not self.is_lazy:
             return
             
-        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(self.url, download=False))
+        data = await robust_extract_info(loop, self.url, ytdl_format_options)
         if not data:
             raise Exception("Lagu tidak tersedia atau private.")
             
@@ -162,7 +231,32 @@ class TrackInfo:
         is_playlist = (playlist_id is not None)
 
         try:
-            data = await loop.run_in_executor(None, lambda: ytdl.extract_info(normalized_query, download=False))
+            if detected_type == "search_query":
+                search_query = f"ytsearch10:{normalized_query}"
+                data = await robust_extract_info(loop, search_query, ytdl_format_options)
+                
+                if data and 'entries' in data:
+                    valid_entries = [e for e in data['entries'] if e]
+                    if valid_entries:
+                        best_entry = None
+                        best_score = -9999
+                        rejected = 0
+                        for entry in valid_entries:
+                            score = score_search_candidate(entry, normalized_query)
+                            if score > best_score:
+                                best_score = score
+                                best_entry = entry
+                            else:
+                                rejected += 1
+                        
+                        logger.info(f"Search selected audio-first candidate | query={normalized_query} | title={best_entry.get('title')} | score={best_score} | rejected={rejected}")
+                        data = {'entries': [best_entry]}
+                    else:
+                        raise Exception("Gagal mengambil lagu. Coba judul atau link lain.")
+                else:
+                    raise Exception("Gagal mengambil lagu. Coba judul atau link lain.")
+            else:
+                data = await robust_extract_info(loop, normalized_query, ytdl_format_options)
         except Exception as e:
             if is_playlist and playlist_id:
                 logger.warning(f"yt-dlp extract_info failed for {normalized_query}, trying fallback with playlist_id {playlist_id}")
@@ -170,8 +264,7 @@ class TrackInfo:
                 try:
                     fallback_opts = dict(ytdl_format_options)
                     fallback_opts.pop('extractor_args', None)
-                    fallback_ytdl = yt_dlp.YoutubeDL(fallback_opts)
-                    data = await loop.run_in_executor(None, lambda: fallback_ytdl.extract_info(fallback_url, download=False))
+                    data = await robust_extract_info(loop, fallback_url, fallback_opts)
                 except Exception as fallback_e:
                     logger.exception(f"Fallback extraction also failed for playlist {playlist_id}: {fallback_e}")
                     raise Exception("Gagal memproses playlist. Coba playlist lain atau pastikan playlist bersifat publik.")
